@@ -1,0 +1,35 @@
+language: generic
+sudo: required
+services:
+  - docker
+
+before_install:
+ - docker build -t dcbadr/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+ - docker run -e CI=true dcbadr/react-test npm test
+
+after_success:
+  - docker build -t dcbadr/multi-client ./client
+  - docker build -t dcbadr/multi-nginx ./nginx
+  - docker build -t dcbadr/multi-server ./server
+  - docker build -t dcbadr/multi-worker ./worker
+  # Log in to the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images and push them to docker hub
+  - docker push dcbadr/multi-client
+  - docker push dcbadr/multi-nginx
+  - docker push dcbadr/multi-server
+  - docker push dcbadr/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: 'us-east-1'
+  app: 'multi-docker'
+  env: 'MultiDocker-env'
+  bucket_name: 'elasticbeanstalk-us-east-1-657705792569'
+  bucket_path: 'docker-multi'
+  on:
+    branch: master
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key: $AWS_SECRET_KEY
